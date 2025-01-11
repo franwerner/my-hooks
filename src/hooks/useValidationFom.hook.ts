@@ -103,4 +103,6 @@ export {
     type FormValidation,
     type  HandlerValidatorForm
 };
-export default useFormValidation
+export {
+    useFormValidation
+}

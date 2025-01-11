@@ -74,4 +74,6 @@ const useCounter = ({
 export {
     type UseCounterProps
 }
-export default useCounter
+export {
+    useCounter
+}

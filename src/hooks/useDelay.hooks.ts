@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 const useDelay = () => {
     const ref = useRef<number | undefined>(undefined)
     const cleanDelay = () => {
@@ -9,14 +9,22 @@ const useDelay = () => {
         if (delay == 0){
             cb()
         }else {
-            const setTime = setTimeout(cb, delay) as unknown as number
+            const setTime = setTimeout(cb, delay * 1000) as unknown as number
             ref.current = setTime
         }
     }
+
+    useEffect(()=>{
+        return () => {
+             cleanDelay()
+        }
+    },[])
     return {
         createDelay,
         cleanDelay
     }
 }
 
-export default useDelay
+export {
+    useDelay
+}

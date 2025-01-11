@@ -1,11 +1,11 @@
 import { isFunction, isObject } from "my-utilities"
 import { useEffect, useRef, useState } from "react"
 import useAbortSignal from "./useAbortSignal.useFetch"
-import useDelay from "./useDelay.useFetch"
 import "./utils/adaptParamsToUrl.utilts"
 import unifyProps from "./utils/unifyProps.utilts"
 import adaptParamsToUrl from "./utils/adaptParamsToUrl.utilts"
 import adaptQuerysToUrl from "./utils/adaptQuerysToUrl.utilts"
+import { useDelay } from "../useDelay.hooks"
 
 declare namespace UseFetch {
 
@@ -84,7 +84,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
      * @request_id : Nos ayuda a indentificar la ejecuccion  del ultimo request, para que una request anterior no modifique el estado de la nueva request,
      *  en casos de que 2 solicitudes se esten procesando al mismo tiempo.
      */
-    const { cleanDelay, createDelay } = useDelay()
+    const { createDelay } = useDelay()
     const [isLoading, setLoading] = useState<boolean>(false)
     const [response, setResponse] = useState<UseFetch.Response<T, U>>({
         result: undefined,
@@ -157,7 +157,6 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         ref.current.is_mounting = true
         return () => {
             ref.current.is_mounting = false
-            cleanDelay()
             abortSignal()
         }
     }, [])
@@ -173,6 +172,8 @@ const useFetch = <T extends object = {}, U extends object = {}>({
 
 export type { UseFetch }
 
-export default useFetch
+export {
+    useFetch
+}
 
 
