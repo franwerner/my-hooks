@@ -4,7 +4,7 @@ const useAbortSignal = () => {
     const ref = useRef<AbortController & { inUsed?: boolean }>({} as AbortController & { inUsed?: boolean })
     const abortSignal = () => {
         if (ref.current.abort && ref.current.inUsed && !ref.current.signal.aborted) {
-            ref.current.abort("abort-cleanup")
+            ref.current.abort("signal-aborted")
         }
     }
     const setSignalUsed = (value: boolean) => {

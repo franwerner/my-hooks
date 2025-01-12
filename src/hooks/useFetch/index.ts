@@ -78,13 +78,14 @@ const useFetch = <T extends object = {}, U extends object = {}>({
     ...request
 }: UseFetch.Props<T, U>) => {
     const { abortSignal, createSignal, setSignalUsed, getSignal } = useAbortSignal()
+    const { createDelay, cleanDelay } = useDelay()
+
     const ref = useRef({ is_mounting: true, request_id: 0 })
     /**
      * @is_mounting :Garantizamos que el componente se encuentre montado para que en casos de que el fetch de error o se aplique un abort la logica se ejecuta en el contexto correcto.
      * @request_id : Nos ayuda a indentificar la ejecuccion  del ultimo request, para que una request anterior no modifique el estado de la nueva request,
      *  en casos de que 2 solicitudes se esten procesando al mismo tiempo.
      */
-    const { createDelay } = useDelay()
     const [isLoading, setLoading] = useState<boolean>(false)
     const [response, setResponse] = useState<UseFetch.Response<T, U>>({
         result: undefined,
@@ -153,11 +154,16 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         }, delay)
     }
 
+    const clearSideEffects = () => {
+        abortSignal()
+        cleanDelay()
+    }
+
     useEffect(() => {
         ref.current.is_mounting = true
         return () => {
             ref.current.is_mounting = false
-            abortSignal()
+            clearSideEffects()
         }
     }, [])
 
@@ -165,10 +171,9 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         isLoading,
         response,
         setRequest,
+        clearSideEffects
     }
 }
-
-
 
 export type { UseFetch }
 
