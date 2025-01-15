@@ -1,108 +1,98 @@
-import { isString } from "my-utilities";
-import { ChangeEvent, useCallback, useState } from "react";
+import { ChangeEvent, useState } from "react";
 
+type Validator<T> = (value: T[keyof T], form: T) => string[] | void
 
-type FieldValidationParams<T> = {
-    fieldName: keyof T
-    value: any
-    currentState: FormValidation<T>
+type Validators<T> = {
+    [K in keyof T]?: Validator<T>
 }
-
-type HandlerValidatorForm<T> = (params: FieldValidationParams<T>) => string[] | string | undefined;
-
-
-type FormValidation<T> = {
-    [K in keyof T]: {
-        value: T[K]
-        errors: string[]
-        hasError: boolean
+interface ValidatorConfig<T> {
+    validators: Validators<T>
+    liveValidation?: boolean,
+    triggerValidation?: {
+        [K in keyof T]?: Array<Exclude<keyof T, K>>
     }
 }
 
-const initializeFormState = <T extends object>(initialValues: T) => {
-    const formState = {} as FormValidation<T>;
-    for (const key in initialValues) {
-        const initialValue = initialValues[key];
-        formState[key] = {
-            value: initialValue,
-            errors: [],
-            hasError: false,
-        }
-    }
-    return formState
-}
+type FormValidationErrors<T> = Partial<Record<keyof T, Array<string>>>
 
-const validateField = <T extends object>(
-    validator: HandlerValidatorForm<T>,
-    fieldParams: FieldValidationParams<T>
-) => {
-    const validationResult = validator(fieldParams)
-    if (Array.isArray(validationResult)) {
-        return validationResult
-    } else if (isString(validationResult)) {
-        return [validationResult]
-    }
-    return []
-}
+const useFormValidation = <T extends object>(initialValues: T, validatorConfig: ValidatorConfig<T>) => {
 
-const useFormValidation = <T extends object>(initialValues: T, validator: HandlerValidatorForm<T>) => {
+    const { liveValidation = true, validators, triggerValidation } = validatorConfig
 
-    const [form, setForm] = useState<FormValidation<T>>(() => initializeFormState(initialValues))
+    const [form, setForm] = useState<T>(() => initialValues)
+    const [errors, setErrors] = useState<FormValidationErrors<T>>({})
 
-    const onChange = ({ target }: ChangeEvent<HTMLInputElement>) => {
-        const { value, name } = target
-        setForm((prev) => {
-            const validationErrors = validateField(validator, {
-                fieldName: name as keyof T,
-                value,
-                currentState: prev,
-            })
-            return {
-                ...prev,
-                [name]: {
-                    value,
-                    errors: validationErrors,
-                    hasError: validationErrors.length > 0,
-                },
-            }
-        })
-    }
-
-    const isFormIncomplete = () => {
-        for (const key in form) {
-            const fieldName = key as keyof T
-            const validationErrors = validateField(validator, {
-                fieldName,
-                value: form[fieldName].value,
-                currentState: form,
-            })
-            if (validationErrors.length > 0) return true
-        }
-    }
-
-    const setValue = useCallback((property: keyof T, value: unknown) => {
+    const updateForm = (name: keyof T, value: T[keyof T]) => {
         setForm((prev) => ({
             ...prev,
-            [property]: {
-                ...prev[property],
-                value 
-            }
+            [name]: value
         }))
-    }, [])
+    }
 
+    const onChange = ({ target }: ChangeEvent<HTMLInputElement>) => {
+        const { name: n, value: v } = target
+        const name = n as keyof T
+        const value = v as T[keyof T]
+
+        generateErrors(name, value)
+        updateForm(name, value)
+    }
+
+    const handlerTriggerValidation = (name: keyof T, currentState: T) => {
+        const currentTrigger = triggerValidation && triggerValidation[name]
+        const acc = {} as FormValidationErrors<T>
+        if (!currentTrigger) return acc
+        return currentTrigger.reduce((acc, current) => {
+            const key = current as keyof T
+            const currentValidator = validators[key]
+            if (currentValidator) {
+                const result = currentValidator(form[key], currentState)
+                acc[key] = result ?? undefined
+            }
+            return acc
+        }, acc)
+    }
+
+    const generateErrors = (name: keyof T, value: T[keyof T]) => {
+        if (!liveValidation) return
+        const currentState = { ...form, [name]: value }
+        const currentValidator = validators[name]
+        const error = currentValidator && currentValidator(value, currentState)
+        const triggerErrors = handlerTriggerValidation(name, currentState)
+        setErrors((prev) => ({
+            ...prev,
+            ...triggerErrors,
+            [name]: error
+        }))
+
+    }
+
+    const handlerValidationForm = () => {
+        const entries = Object.entries(validators) as [keyof T, Validator<T>][]
+        let errors = {} as FormValidationErrors<T>
+        for (const [k, validators] of entries) {
+            const key = k as keyof T
+            const currentValue = form[key]
+            const res = validators(currentValue, form)
+            if (res) {
+                errors[key] = res
+            }
+        }
+        return {
+            setErrors: () => setErrors(errors),
+            hasError: Object.keys(errors).length > 0,
+            errors
+        }
+    }
 
     return {
         onChange,
+        setForm,
         form,
-        isFormIncomplete,
-        setValue
+        errors,
+        handlerValidationForm
     };
 }
 
-export {
-    type FormValidation,
-    type  HandlerValidatorForm
-};
-export {
-    useFormValidation
-}
+export { type FormValidationErrors }
+export { useFormValidation };

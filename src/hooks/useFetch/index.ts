@@ -152,6 +152,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                 }
             }
         }, delay)
+
     }
 
     const clearSideEffects = () => {
