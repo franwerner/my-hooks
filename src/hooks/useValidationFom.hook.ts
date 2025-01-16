@@ -13,6 +13,23 @@ interface ValidatorConfig<T> {
     }
 }
 
+/**
+ * @implements
+ * La idea de integrar `triggerValidation` es permitir la ejecución de validaciones que dependen de otras propiedades del formulario.
+ * Por ejemplo, si tenemos un campo `password` y un campo `confirm_password`, se requiere que cuando el valor de `password` cambie, 
+ * se valide automáticamente el campo `confirm_password` para verificar si ambas contraseñas coinciden.
+ *
+ * @example
+ * const triggerValidation = {
+ *   password: ['confirm_password'], // Cuando `password` cambia, se valida `confirm_password`
+ * };
+ * 
+ * De esta manera, podemos especificar en el array de `triggerValidation` qué campos deben ser validados cuando otros campos cambian,
+ * garantizando que las validaciones se realicen de manera coherente y en tiempo real, según las dependencias entre los campos del formulario.
+ */
+
+type SetValidationForm<T> = (name: keyof T, value: T[keyof T]) => { setError: () => void, removeError: () => void }
+
 type FormValidationErrors<T> = Partial<Record<keyof T, Array<string>>>
 
 const useFormValidation = <T extends object>(initialValues: T, validatorConfig: ValidatorConfig<T>) => {
@@ -20,7 +37,13 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
     const { liveValidation = true, validators, triggerValidation } = validatorConfig
 
     const [form, setForm] = useState<T>(() => initialValues)
-    const [errors, setErrors] = useState<FormValidationErrors<T>>({})
+    const [errors, setErrors] = useState<{
+        list: FormValidationErrors<T>,
+        hasError: boolean
+    }>({
+        list: {},
+        hasError: false
+    })
 
     const updateForm = (name: keyof T, value: T[keyof T]) => {
         setForm((prev) => ({
@@ -59,11 +82,17 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         const currentValidator = validators[name]
         const error = currentValidator && currentValidator(value, currentState)
         const triggerErrors = handlerTriggerValidation(name, currentState)
-        setErrors((prev) => ({
-            ...prev,
-            ...triggerErrors,
-            [name]: error
-        }))
+        setErrors((prev) => {
+            const list = {
+                ...prev.list,
+                ...triggerErrors,
+                [name]: error
+            }
+            return {
+                list,
+                hasError: Object.entries(list).filter(([_, value]) => value).length > 0
+            }
+        })
 
     }
 
@@ -78,21 +107,43 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
                 errors[key] = res
             }
         }
+        const hasError = Object.keys(errors).length > 0
         return {
-            setErrors: () => setErrors(errors),
-            hasError: Object.keys(errors).length > 0,
+            setErrors: () => {
+                if (!hasError) return
+                setErrors({ list: errors, hasError })
+            },
+            hasError,
             errors
+        }
+    }
+
+    const setValidationForm: SetValidationForm<T> = (name, value) => {
+        updateForm(name, value)
+        return {
+            setError: () => generateErrors(name, value),
+            removeError: () => setErrors(prev => {
+                const filter = Object.entries(prev.list).filter(([key, value]) => (key !== name) && value)
+                return {
+                    list: Object.fromEntries(filter) as FormValidationErrors<T>,
+                    hasError: filter.length > 0
+                }
+            }),
         }
     }
 
     return {
         onChange,
-        setForm,
+        setForm: setValidationForm,
         form,
         errors,
         handlerValidationForm
     };
 }
 
-export { type FormValidationErrors }
+export type { FormValidationErrors, SetValidationForm }
 export { useFormValidation };
+
+/**
+ * Falta refactorizar y crear las funciones fuera del hook, para ahorra recursos.
+ */
