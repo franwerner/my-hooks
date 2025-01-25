@@ -5,11 +5,11 @@ interface UseCounterProps {
     hours?: number
     minutes?: number
     seconds?: number,
-    milliseconds?:number
+    milliseconds?: number
     type?: "increment" | "decrement",
     stop?: boolean,
     step?: number,
-    onFinish ?: () => void
+    onFinish?: () => void
 }
 
 const hourInSeconds = 3600
@@ -26,7 +26,7 @@ const useCounter = ({
     onFinish
 }: UseCounterProps = {}) => {
 
-    const verifyStep = step <= 1 ? 1 : step 
+    const verifyStep = step <= 1 ? 1 : step
 
     const hoursToSeconds = Math.abs(hours) * hourInSeconds
     const minutesToSeconds = Math.abs(minutes) * minuteInSeconds
@@ -37,7 +37,8 @@ const useCounter = ({
     const hoursResidue = Math.floor(count / hourInSeconds)
     const minutesResidue = Math.floor((count % hourInSeconds) / minuteInSeconds)
     const secondsResidue = Math.floor((count % hourInSeconds) % minuteInSeconds)
-    
+
+  
     useEffect(() => {
         if (stop) return
         const interval = setInterval(() => {
@@ -48,7 +49,7 @@ const useCounter = ({
                     clearInterval(interval)
                     isFunction(onFinish) && onFinish()
                     return type === "decrement" ? 0 : calculateSeconds
-                    
+
                 } else {
                     return nextCount
                 }

@@ -8,7 +8,6 @@ import adaptQuerysToUrl from "./utils/adaptQuerysToUrl.utilts"
 import { useDelay } from "../useDelay.hooks"
 
 declare namespace UseFetch {
-
     interface SuccessResponse<T> {
         success?: true
         status?: number
@@ -41,38 +40,17 @@ declare namespace UseFetch {
 }
 
 /**
- * @Introducción
- * Este hook está diseñado para gestionar solicitudes `fetch` únicas, asegurando que:
- * 
- * - **Gestión de solicitudes únicas**:
- *   - Cada solicitud genera un identificador único `request_id` para garantizar que solo la solicitud más reciente pueda actualizar el estado de React.
- *   - Si una solicitud es abortada, cualquier intento de actualizar el estado relacionado será ignorado.
- *   - Toda nueva ejecuccion de `setRequest()` aborta la solicitud inclusive si la respuesta del fetch ya se encuentra en la task queue lista par ser ejecutada.
- * 
- * 
- * @Nota
- * - Este comportamiento es crucial en escenarios donde se generan múltiples solicitudes de forma concurrente.
- * - Debido a la naturaleza de `async/await` y la liberación de la callstack, una solicitud anterior podría intentar actualizar el estado después de haber sido abortada.
- * - Este hook previene tales escenarios garantizando que solo la solicitud más reciente sea relevante para el estado.
- * 
- * @Ejemplo
- * Supongamos que el usuario hace clic rápidamente en un botón que genera solicitudes consecutivas:
- * 
- * 1. La primera solicitud comienza, pero antes de completarse, se genera una segunda solicitud.
- * 2. La primera solicitud se aborta y su estado asociado no se actualizará.
- * 3. Solo la segunda solicitud (la más reciente) determinará el estado final.
- * 
- * @Beneficio
- * Este enfoque asegura que el estado de la aplicación sea coherente y evite actualizaciones redundantes o incorrectas causadas por solicitudes anteriores.
- */
-
-/**
  * T = Valores success.
  * U = Valores failed
  * Esto no permite definir que recibira tanto onSuccess y onFailed.
  * la propiedad `result` recibira una combinacion de estos 2 tipos.
  */
 
+/**
+ * @is_mounting : Garantiza que el componente se encuentre montado. Esto evita que la lógica (como actualizaciones de estado) 
+ * se ejecute fuera del contexto correcto en casos donde el fetch falle, se aborte o se intente actualizar el estado tras el desmontaje.
+ * 
+*/
 
 const useFetch = <T extends object = {}, U extends object = {}>({
     ...request
@@ -80,12 +58,8 @@ const useFetch = <T extends object = {}, U extends object = {}>({
     const { abortSignal, createSignal, setSignalUsed, getSignal } = useAbortSignal()
     const { createDelay, cleanDelay } = useDelay()
 
-    const ref = useRef({ is_mounting: true, request_id: 0 })
-    /**
-     * @is_mounting :Garantizamos que el componente se encuentre montado para que en casos de que el fetch de error o se aplique un abort la logica se ejecuta en el contexto correcto.
-     * @request_id : Nos ayuda a indentificar la ejecuccion  del ultimo request, para que una request anterior no modifique el estado de la nueva request,
-     *  en casos de que 2 solicitudes se esten procesando al mismo tiempo.
-     */
+    const ref = useRef({ is_mounting: true })
+
     const [isLoading, setLoading] = useState<boolean>(false)
     const [response, setResponse] = useState<UseFetch.Response<T, U>>({
         result: undefined,
@@ -96,10 +70,8 @@ const useFetch = <T extends object = {}, U extends object = {}>({
     const setRequest = (props: UseFetch.SetRequestProps<T, U> = {}) => {
         const currentProps = unifyProps(request, props)
         const { target = "/", query, onSuccess, onFailed, body = {}, params = {}, delay, method = "GET", basename = "", ...rest } = currentProps
-        abortSignal()
-        createDelay(async () => {
+        createDelay(async () => { //Si es 0, se ejecuta todo de manera sincrona.
             createSignal()
-            const context_id = ++ref.current.request_id
             {
                 const concatTarget = `${adaptParamsToUrl(params, basename + target)}${adaptQuerysToUrl(query)}`.replaceAll("//", "/")
                 try {
@@ -112,7 +84,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                         method
                     })
 
-                    const json = await res.json() //Si la señal se aborta, inclusive despues de que el fetch se resuelvan esto dara error.
+                    const json = await res.json() //Si la señal se aborta, inclusive despues de que el fetch se resuelvan esto se ejectura de manera sincrona y dara error.
 
                     if (!res.ok) throw {
                         status: res.status,
@@ -124,14 +96,14 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                         success: true,
                         result: json,
                     }
-                    if (!ref.current.is_mounting || context_id !== ref.current.request_id) return
+                    if (!ref.current.is_mounting) return
                     isFunction(onSuccess) && onSuccess(response)
                     setResponse({
                         ...response,
                         result_error: undefined
                     })
                 } catch (error: unknown) {
-                    if (!ref.current.is_mounting || context_id !== ref.current.request_id) return
+                    if (!ref.current.is_mounting) return
 
                     const isFailedResponse = (isObject(error) ? error : {}) as Required<UseFetch.FailedResponse<U>>
                     const response: Required<UseFetch.FailedResponse<U>> = {
@@ -146,7 +118,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                     })
                 }
                 finally {
-                    if (!ref.current.is_mounting || context_id !== ref.current.request_id) return
+                    if (!ref.current.is_mounting) return
                     setSignalUsed(false)
                     setLoading(false)
                 }
@@ -181,5 +153,7 @@ export type { UseFetch }
 export {
     useFetch
 }
+
+
 
 

@@ -7,7 +7,6 @@ const useDelay = () => {
         ref.current = undefined
     }
     const createDelay = (cb: () => void, delay: number = 0) => {
-        cleanDelay()
         if (delay == 0) {
             cb()
         } else {

@@ -27,10 +27,11 @@ interface ValidatorConfig<T> {
  * De esta manera, podemos especificar en el array de `triggerValidation` qué campos deben ser validados cuando otros campos cambian,
  * garantizando que las validaciones se realicen de manera coherente y en tiempo real, según las dependencias entre los campos del formulario.
  */
-
-type SetValidationForm<T> = (name: keyof T, value: T[keyof T]) => { setError: () => void, removeError: () => void }
-
 type FormValidationErrors<T> = Partial<Record<keyof T, Array<string>>>
+
+type SetValidationForm<T> = (form: Partial<T>) =>  { errors: FormValidationErrors<T>, hasError: boolean } 
+
+const listHasError = <T>(list: FormValidationErrors<T>) => Object.entries(list).filter(([_, value]) => value).length > 0
 
 const useFormValidation = <T extends object>(initialValues: T, validatorConfig: ValidatorConfig<T>) => {
 
@@ -56,20 +57,20 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         const { name: n, value: v } = target
         const name = n as keyof T
         const value = v as T[keyof T]
-
         generateErrors(name, value)
         updateForm(name, value)
     }
 
-    const handlerTriggerValidation = (name: keyof T, currentState: T) => {
+    const handlerTriggerValidation = (name: keyof T, currentState: T, omit: (keyof T)[] = []) => {
         const currentTrigger = triggerValidation && triggerValidation[name]
         const acc = {} as FormValidationErrors<T>
         if (!currentTrigger) return acc
-        return currentTrigger.reduce((acc, current) => {
+        const omitTriggers = omit.length > 0 ? currentTrigger.filter(i => !omit.includes(i)) : currentTrigger
+        return omitTriggers.reduce((acc, current) => {
             const key = current as keyof T
             const currentValidator = validators[key]
             if (currentValidator) {
-                const result = currentValidator(form[key], currentState)
+                const result = currentValidator(currentState[key], currentState)
                 acc[key] = result ?? undefined
             }
             return acc
@@ -90,10 +91,10 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
             }
             return {
                 list,
-                hasError: Object.entries(list).filter(([_, value]) => value).length > 0
+                hasError: listHasError(list)
             }
         })
-
+        return error
     }
 
     const handlerValidationForm = () => {
@@ -109,26 +110,43 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         }
         const hasError = Object.keys(errors).length > 0
         return {
-            setErrors: () => {
-                if (!hasError) return
-                setErrors({ list: errors, hasError })
-            },
+            setErrors: () => setErrors({ list: errors, hasError }),
             hasError,
             errors
         }
     }
 
-    const setValidationForm: SetValidationForm<T> = (name, value) => {
-        updateForm(name, value)
+    const setValidationForm: SetValidationForm<T> = (newForm) => {
+        setForm(prev => ({ ...prev, ...newForm }))
+
+        const currentState = { ...form, ...newForm }
+        let errors = {} as FormValidationErrors<T>
+        let omits = Object.keys(newForm) as (keyof T)[]
+        for (const k in newForm) {
+            const key = k as keyof T
+            const validator = validators[k]
+            const value = newForm[key] as any
+            const res = validator && validator(value, currentState)
+            const trigger = handlerTriggerValidation(key, currentState, omits)
+            errors = {
+                ...errors,
+                ...trigger,
+                [k]: res,
+            }
+        }
+        setErrors(prev => {
+            const list = {
+                ...prev.list,
+                ...errors
+            }
+            return {
+                list,
+                hasError: listHasError(list)
+            }
+        })
         return {
-            setError: () => generateErrors(name, value),
-            removeError: () => setErrors(prev => {
-                const filter = Object.entries(prev.list).filter(([key, value]) => (key !== name) && value)
-                return {
-                    list: Object.fromEntries(filter) as FormValidationErrors<T>,
-                    hasError: filter.length > 0
-                }
-            }),
+            errors,
+            hasError: listHasError(errors)
         }
     }
 

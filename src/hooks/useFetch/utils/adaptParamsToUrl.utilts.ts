@@ -9,7 +9,7 @@ const adaptParamsToUrl = (params: UseFetch.QueryParams, target: string) => {
 
     for (const key in params) {
         const value = params[key]
-        if (value || value == 0) {
+        if(value !== undefined){
             currentTarget += `/${value}/`
         }
     }
