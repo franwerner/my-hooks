@@ -2,7 +2,6 @@ import { isFunction, isObject } from "my-utilities"
 import { useEffect, useRef, useState } from "react"
 import useAbortSignal from "./useAbortSignal.useFetch"
 import "./utils/adaptParamsToUrl.utilts"
-import unifyProps from "./utils/unifyProps.utilts"
 import adaptParamsToUrl from "./utils/adaptParamsToUrl.utilts"
 import adaptQuerysToUrl from "./utils/adaptQuerysToUrl.utilts"
 import { useDelay } from "../useDelay.hooks"
@@ -10,13 +9,13 @@ import { useDelay } from "../useDelay.hooks"
 declare namespace UseFetch {
     interface SuccessResponse<T> {
         success?: true
-        status?: number
+        status?: number | string
         result?: T
     }
 
     interface FailedResponse<U> {
         success?: false
-        status?: number
+        status?: number | string
         result_error?: U
     }
 
@@ -34,8 +33,6 @@ declare namespace UseFetch {
         delay?: number,
         params?: QueryParams
     }
-
-
     type SetRequestProps<T, U> = Omit<Partial<Props<T, U>>, "target" | "basename">
 }
 
@@ -58,7 +55,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
     const { abortSignal, createSignal, setSignalUsed, getSignal } = useAbortSignal()
     const { createDelay, cleanDelay } = useDelay()
 
-    const ref = useRef({ is_mounting: true })
+    const ref = useRef({ is_mounting: true, request_id: 0 })
 
     const [isLoading, setLoading] = useState<boolean>(false)
     const [response, setResponse] = useState<UseFetch.Response<T, U>>({
@@ -68,8 +65,10 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         status: undefined
     })
     const setRequest = (props: UseFetch.SetRequestProps<T, U> = {}) => {
-        const currentProps = unifyProps(request, props)
+        const currentProps = { ...request, ...props }
         const { target = "/", query, onSuccess, onFailed, body = {}, params = {}, delay, method = "GET", basename = "", ...rest } = currentProps
+        const contextID = ++ref.current.request_id
+        abortSignal()
         createDelay(async () => { //Si es 0, se ejecuta todo de manera sincrona.
             createSignal()
             {
@@ -83,28 +82,24 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                         signal: getSignal().signal,
                         method
                     })
-
                     const json = await res.json() //Si la señal se aborta, inclusive despues de que el fetch se resuelvan esto se ejectura de manera sincrona y dara error.
-
                     if (!res.ok) throw {
                         status: res.status,
                         result_error: json,
                     }
-
                     const response: Required<UseFetch.SuccessResponse<T>> = {
                         status: res.status,
                         success: true,
                         result: json,
                     }
-                    if (!ref.current.is_mounting) return
+                    if (!ref.current.is_mounting || ref.current.request_id !== contextID) return
                     isFunction(onSuccess) && onSuccess(response)
                     setResponse({
                         ...response,
                         result_error: undefined
                     })
                 } catch (error: unknown) {
-                    if (!ref.current.is_mounting) return
-
+                    if (!ref.current.is_mounting || ref.current.request_id !== contextID) return
                     const isFailedResponse = (isObject(error) ? error : {}) as Required<UseFetch.FailedResponse<U>>
                     const response: Required<UseFetch.FailedResponse<U>> = {
                         result_error: isFailedResponse.result_error ?? {},
@@ -118,7 +113,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                     })
                 }
                 finally {
-                    if (!ref.current.is_mounting) return
+                    if (!ref.current.is_mounting || ref.current.request_id !== contextID) return
                     setSignalUsed(false)
                     setLoading(false)
                 }

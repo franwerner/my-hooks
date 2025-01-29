@@ -13,6 +13,15 @@ interface ValidatorConfig<T> {
     }
 }
 
+type FormValidationErrors<T> = Partial<Record<keyof T, Array<string>>>
+
+
+type CheckFormErrors<T> = () => {
+    setErrors: () => void,
+    hasError: boolean,
+    errors: FormValidationErrors<T>
+}
+
 /**
  * @implements
  * La idea de integrar `triggerValidation` es permitir la ejecución de validaciones que dependen de otras propiedades del formulario.
@@ -27,9 +36,8 @@ interface ValidatorConfig<T> {
  * De esta manera, podemos especificar en el array de `triggerValidation` qué campos deben ser validados cuando otros campos cambian,
  * garantizando que las validaciones se realicen de manera coherente y en tiempo real, según las dependencias entre los campos del formulario.
  */
-type FormValidationErrors<T> = Partial<Record<keyof T, Array<string>>>
 
-type SetValidationForm<T> = (form: Partial<T>) =>  { errors: FormValidationErrors<T>, hasError: boolean } 
+type SetValidationForm<T> = (form: Partial<T>) => { errors: FormValidationErrors<T>, hasError: boolean }
 
 const listHasError = <T>(list: FormValidationErrors<T>) => Object.entries(list).filter(([_, value]) => value).length > 0
 
@@ -97,7 +105,7 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         return error
     }
 
-    const handlerValidationForm = () => {
+    const checkFormErrors:CheckFormErrors<T> = () => {
         const entries = Object.entries(validators) as [keyof T, Validator<T>][]
         let errors = {} as FormValidationErrors<T>
         for (const [k, validators] of entries) {
@@ -110,9 +118,11 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         }
         const hasError = Object.keys(errors).length > 0
         return {
-            setErrors: () => setErrors({ list: errors, hasError }),
-            hasError,
-            errors
+            setErrors: () => {
+                setErrors({ list: errors, hasError })
+            },
+           errors,
+           hasError
         }
     }
 
@@ -155,11 +165,11 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         setForm: setValidationForm,
         form,
         errors,
-        handlerValidationForm
+        checkFormErrors
     };
 }
 
-export type { FormValidationErrors, SetValidationForm }
+export type { FormValidationErrors, SetValidationForm, CheckFormErrors }
 export { useFormValidation };
 
 /**
