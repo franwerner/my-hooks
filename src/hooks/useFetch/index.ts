@@ -7,23 +7,23 @@ import adaptQuerysToUrl from "./utils/adaptQuerysToUrl.utilts"
 import { useDelay } from "../useDelay.hooks"
 
 declare namespace UseFetch {
-    interface SuccessResponse<T> {
+    interface SuccessResponse<T extends object> {
         success?: true
         status?: number | string
         result?: T
     }
 
-    interface FailedResponse<U> {
+    interface FailedResponse<U extends object> {
         success?: false
         status?: number | string
         result_error?: U
     }
 
-    type Response<T = any, U = any> = Omit<SuccessResponse<T> & FailedResponse<U>, "success"> & { success?: boolean }
+    type Response<T extends object, U extends object> = Omit<SuccessResponse<T> & FailedResponse<U>, "success"> & { success?: boolean }
 
     type QueryParams = { [key: string]: string | number | undefined | null | boolean }
 
-    interface Props<T = any, U = any,> extends Omit<RequestInit, "signal" | "body"> {
+    interface Props<T extends object, U extends object,> extends Omit<RequestInit, "signal" | "body"> {
         target?: string,
         basename?: string
         query?: QueryParams,
@@ -33,7 +33,7 @@ declare namespace UseFetch {
         delay?: number,
         params?: QueryParams
     }
-    type SetRequestProps<T, U> = Omit<Partial<Props<T, U>>, "target" | "basename">
+    type SetRequestProps<T extends object, U extends object> = Omit<Partial<Props<T, U>>, "target" | "basename">
 }
 
 /**
@@ -65,7 +65,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         status: undefined
     })
     const setRequest = (props: UseFetch.SetRequestProps<T, U> = {}) => {
-        const currentProps = { ...request, ...props }
+        const currentProps = {...request,...props}
         const { target = "/", query, onSuccess, onFailed, body = {}, params = {}, delay, method = "GET", basename = "", ...rest } = currentProps
         const contextID = ++ref.current.request_id
         abortSignal()
