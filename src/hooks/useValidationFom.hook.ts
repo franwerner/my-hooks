@@ -105,7 +105,7 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         return error
     }
 
-    const checkFormErrors:CheckFormErrors<T> = () => {
+    const checkFormErrors: CheckFormErrors<T> = () => {
         const entries = Object.entries(validators) as [keyof T, Validator<T>][]
         let errors = {} as FormValidationErrors<T>
         for (const [k, validators] of entries) {
@@ -121,8 +121,8 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
             setErrors: () => {
                 setErrors({ list: errors, hasError })
             },
-           errors,
-           hasError
+            errors,
+            hasError
         }
     }
 
@@ -160,12 +160,18 @@ const useFormValidation = <T extends object>(initialValues: T, validatorConfig: 
         }
     }
 
+    const resetForm = () => {
+        setForm(initialValues)
+        setErrors({ hasError: false, list: {} })
+    }
+
     return {
         onChange,
         setForm: setValidationForm,
         form,
         errors,
-        checkFormErrors
+        checkFormErrors,
+        resetForm
     };
 }
 
