@@ -1,7 +1,6 @@
 import { isFunction, isObject } from "my-utilities"
 import { useEffect, useRef, useState } from "react"
 import useAbortSignal from "./useAbortSignal.useFetch"
-import "./utils/adaptParamsToUrl.utilts"
 import adaptParamsToUrl from "./utils/adaptParamsToUrl.utilts"
 import adaptQuerysToUrl from "./utils/adaptQuerysToUrl.utilts"
 import { useDelay } from "../useDelay.hooks"
@@ -32,8 +31,12 @@ declare namespace UseFetch {
         body?: { [key: string]: any }
         delay?: number,
         params?: QueryParams
+        preventUpdate?: boolean /*
+        Esta propiedad nos ayuda a prevenir actualizacion innecesarios,
+        En casos donde se maneja un estado propio y este se actualice mediante onSuccess/onFailed
+        */
     }
-    type SetRequestProps<T extends object, U extends object> = Omit<Partial<Props<T, U>>, "target" | "basename">
+    type SetRequestProps<T extends object, U extends object> = Omit<Partial<Props<T, U>>, "target" | "basename" | "preventUpdate">
 }
 
 /**
@@ -50,6 +53,7 @@ declare namespace UseFetch {
 */
 
 const useFetch = <T extends object = {}, U extends object = {}>({
+    preventUpdate,
     ...request
 }: UseFetch.Props<T, U>) => {
     const { abortSignal, createSignal, setSignalUsed, getSignal } = useAbortSignal()
@@ -65,7 +69,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
         status: undefined
     })
     const setRequest = (props: UseFetch.SetRequestProps<T, U> = {}) => {
-        const currentProps = {...request,...props}
+        const currentProps = { ...request, ...props }
         const { target = "/", query, onSuccess, onFailed, body = {}, params = {}, delay, method = "GET", basename = "", ...rest } = currentProps
         const contextID = ++ref.current.request_id
         abortSignal()
@@ -94,7 +98,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                     }
                     if (!ref.current.is_mounting || ref.current.request_id !== contextID) return
                     isFunction(onSuccess) && onSuccess(response)
-                    setResponse({
+                    preventUpdate && setResponse({
                         ...response,
                         result_error: undefined
                     })
@@ -107,7 +111,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                         success: false
                     }
                     isFunction(onFailed) && onFailed(response)
-                    setResponse({
+                    preventUpdate && setResponse({
                         ...response,
                         result: undefined
                     })
