@@ -33,7 +33,7 @@ declare namespace UseFetch {
         params?: QueryParams
         preventUpdate?: boolean /*
         Esta propiedad nos ayuda a prevenir actualizacion innecesarios,
-        En casos donde se maneja un estado propio y este se actualice mediante onSuccess/onFailed
+        En casos donde se maneja un estado propio y este se actualice mediante onSuccess/onFailed.
         */
     }
     type SetRequestProps<T extends object, U extends object> = Omit<Partial<Props<T, U>>, "target" | "basename" | "preventUpdate">
@@ -98,7 +98,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                     }
                     if (!ref.current.is_mounting || ref.current.request_id !== contextID) return
                     isFunction(onSuccess) && onSuccess(response)
-                    preventUpdate && setResponse({
+                    !preventUpdate && setResponse({
                         ...response,
                         result_error: undefined
                     })
@@ -111,7 +111,7 @@ const useFetch = <T extends object = {}, U extends object = {}>({
                         success: false
                     }
                     isFunction(onFailed) && onFailed(response)
-                    preventUpdate && setResponse({
+                    !preventUpdate && setResponse({
                         ...response,
                         result: undefined
                     })
